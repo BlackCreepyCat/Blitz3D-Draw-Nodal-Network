@@ -263,6 +263,10 @@ While Not KeyHit(1)
         new_node\Py = (MouseY() - 300) / cam_zoom - cam_y
         new_node\TargetX = new_node\Px
         new_node\TargetY = new_node\Py
+
+    ; Sélectionner automatiquement le dernier node créé
+    last_selected = new_node
+
     EndIf
     
     ; Interpolation des positions pour les nodes
@@ -335,3 +339,4 @@ While Not KeyHit(1)
 Wend
 
 End
+
