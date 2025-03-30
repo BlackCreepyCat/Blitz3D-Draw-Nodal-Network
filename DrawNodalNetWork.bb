@@ -1,13 +1,13 @@
-; ----------------------------------------
-; Name : Draw Nodal network
+; -----------------------------------------------
+; Name : Draw Nodal network V2 with root creation
 ; Date : (C)2025
 ; Site : https://github.com/BlackCreepyCat
-; ----------------------------------------
+; -----------------------------------------------
 
-Graphics 800,600,0,2
+Graphics 1920,1080,0,2
 SetBuffer BackBuffer()
 
-; DÈfinition du type NodalNet
+; D√©finition du type NodalNet
 Type NodalNet
     Field NType%        ; 0 = Point de liaison, 1 = Valeur
     Field Radius%       ; Rayon du cercle pour les nodes de valeur
@@ -15,19 +15,19 @@ Type NodalNet
     Field Value#        ; Valeur du node
     Field Px%          ; Position X
     Field Py%          ; Position Y
-    Field Caption$     ; LÈgende du node
+    Field Caption$     ; L√©gende du node
 End Type
 
-; Variables globales pour la camÈra
+; Variables globales pour la cam√©ra
 Global cam_zoom# = 1.0
 Global cam_x# = 0
 Global cam_y# = 0
 Global mouse_down = False
 Global last_mx%, last_my%
-Global selected_node.NodalNet = Null ; Node actuellement sÈlectionnÈ
-Global last_selected.NodalNet = Null ; Dernier node sÈlectionnÈ
+Global selected_node.NodalNet = Null ; Node actuellement s√©lectionn√©
+Global last_selected.NodalNet = Null ; Dernier node s√©lectionn√©
 
-; CrÈation du rÈseau de test
+; Cr√©ation du r√©seau de test
 Function CreateTestNetwork()
     ; Node racine (point de liaison)
     root.NodalNet = New NodalNet
@@ -36,7 +36,7 @@ Function CreateTestNetwork()
     root\Py = 00
     root\Caption = "Root"
     
-    ; CrÈation de nodes de valeur mieux rÈpartis
+    ; Cr√©ation de nodes de valeur mieux r√©partis
     For i = 1 To 15
         node.NodalNet = New NodalNet
         node\NType = 1
@@ -44,7 +44,7 @@ Function CreateTestNetwork()
         node\Radius = node\Value / 2
         node\Parent = root
         node\Caption = "Node" + i
-        ; RÈpartition en spirale pour Èviter les chevauchements
+        ; R√©partition en spirale pour √©viter les chevauchements
         angle# = i * 24 ; Angle plus petit pour plus de points
         dist# = 50 + i * 20 ; Distance croissante
         node\Px = root\Px + Cos(angle) * dist
@@ -52,17 +52,31 @@ Function CreateTestNetwork()
     Next
 End Function
 
-; Fonction pour vÈrifier si la souris est sur un node
+; V√©rifie si un node a des enfants
+Function HasChildren(node.NodalNet)
+    For child.NodalNet = Each NodalNet
+        If child\Parent = node Then
+            Return True
+        EndIf
+    Next
+    Return False
+End Function
+
+; Fonction pour v√©rifier si la souris est sur un node (roots inclus)
 Function CheckNodeUnderMouse.NodalNet()
     mx# = (MouseX() - 400) / cam_zoom - cam_x
     my# = (MouseY() - 300) / cam_zoom - cam_y
     
     For node.NodalNet = Each NodalNet
-        If node\NType = 1 Then ; Seulement les nodes de valeur
-            dx# = node\Px - mx
-            dy# = node\Py - my
-            dist# = Sqr(dx*dx + dy*dy)
+        dx# = node\Px - mx
+        dy# = node\Py - my
+        dist# = Sqr(dx*dx + dy*dy)
+        If node\NType = 1 Then ; Nodes de valeur
             If dist < node\Radius Then
+                Return node
+            EndIf
+        ElseIf node\NType = 0 Then ; Roots
+            If dist < 10 Then ; Rayon fixe pour les roots (ajustable)
                 Return node
             EndIf
         EndIf
@@ -89,20 +103,20 @@ While Not KeyHit(1) ; ESC pour quitter
             last_mx = MouseX()
             last_my = MouseY()
             
-            ; VÈrifier si on clique sur un node
+            ; V√©rifier si on clique sur un node (roots ou valeur)
             selected_node = CheckNodeUnderMouse()
             If selected_node <> Null Then
-                last_selected = selected_node ; Mettre ‡ jour le dernier sÈlectionnÈ
+                last_selected = selected_node ; Mettre √† jour le dernier s√©lectionn√©
             EndIf
         Else
             If selected_node <> Null Then
-                ; DÈplacer le node sÈlectionnÈ
+                ; D√©placer le node s√©lectionn√© (fonctionne pour roots et valeur)
                 mx# = (MouseX() - 400) / cam_zoom - cam_x
                 my# = (MouseY() - 300) / cam_zoom - cam_y
                 selected_node\Px = mx
                 selected_node\Py = my
             Else
-                ; DÈplacer la camÈra
+                ; D√©placer la cam√©ra
                 cam_x = cam_x + (MouseX() - last_mx) / cam_zoom
                 cam_y = cam_y + (MouseY() - last_my) / cam_zoom
                 last_mx = MouseX()
@@ -122,12 +136,22 @@ If MouseHit(2) And last_selected <> Null Then
     new_node\Radius = new_node\Value / 2
     new_node\Parent = last_selected
     new_node\Caption = "New" + Rnd(1,1000)
-    ; Positionner le nouveau node ‡ la position de la souris dans le monde
+    ; Positionner le nouveau node √† la position de la souris dans le monde
     new_node\Px = (MouseX() - 400) / cam_zoom - cam_x
     new_node\Py = (MouseY() - 300) / cam_zoom - cam_y
 EndIf
     
-    ; Dessin du rÈseau
+; Gestion du clic milieu - Ajout d'un nouveau root et mise √† jour du root en cours
+If MouseHit(3) Then
+    new_root.NodalNet = New NodalNet
+    new_root\NType = 0
+    new_root\Px = (MouseX() - 400) / cam_zoom - cam_x
+    new_root\Py = (MouseY() - 300) / cam_zoom - cam_y
+    new_root\Caption = "Root" + Rnd(1,1000)
+    last_selected = new_root ; D√©finit le nouveau root comme le dernier s√©lectionn√©
+EndIf
+
+    ; Dessin du r√©seau
     For node.NodalNet = Each NodalNet
         screen_x# = (node\Px + cam_x) * cam_zoom + 400
         screen_y# = (node\Py + cam_y) * cam_zoom + 300
@@ -140,33 +164,38 @@ EndIf
             Line screen_x, screen_y, parent_x, parent_y
         EndIf
         
-        ; Dessin des nodes
-        If node\NType = 0 Then
-            Color 255,0,0
-            Plot screen_x, screen_y
-            Oval screen_x-3, screen_y-3, 6, 6, 0
-            Color 255,255,255
-            Text screen_x, screen_y+10, node\Caption, True, False
-        Else
-            radius_scaled# = node\Radius * cam_zoom
-            If node = selected_node Then
-                Color 0,255,0 ; Vert si actuellement sÈlectionnÈ
-            ElseIf node = last_selected Then
-                Color 0,255,0 ; Vert si dernier sÈlectionnÈ
-            Else
-                Color 0,0,255 ; Bleu sinon
-            EndIf
-            Oval screen_x - radius_scaled, screen_y - radius_scaled, radius_scaled * 2, radius_scaled * 2, 0
-            Color 255,255,255
-            Text screen_x, screen_y-10, node\Caption, True, False ; Caption au-dessus
-            Text screen_x, screen_y, Int(node\Value), True, True ; Valeur au centre
-        EndIf
+; Dessin des nodes
+If node\NType = 0 Then
+    Color 255,0,0
+    Plot screen_x, screen_y
+    Oval screen_x-3, screen_y-3, 6, 6, 0
+    Color 255,255,255
+    Text screen_x, screen_y+10, node\Caption, True, False
+Else
+    radius_scaled# = node\Radius * cam_zoom
+    If node = selected_node Then
+        Color 0,255,0 ; Vert si actuellement s√©lectionn√©
+    ElseIf node = last_selected Then
+        Color 0,255,0 ; Vert si dernier s√©lectionn√©
+    ElseIf HasChildren(node) Then
+        Color 255,165,0 ; Orange si le node a des enfants
+    Else
+        Color 0,0,255 ; Bleu sinon
+    EndIf
+
+
+    Oval screen_x - radius_scaled, screen_y - radius_scaled, radius_scaled * 2, radius_scaled * 2, 0
+    Color 255,255,255
+    Text screen_x, screen_y+20, node\Caption, True, False ; Caption au-dessus
+    Text screen_x, screen_y, Int(node\Value), True, True ; Valeur au centre
+EndIf
+
     Next
     
     ; Affichage des infos
     Color 255,255,255
     Text 10,10, "Zoom: "+cam_zoom
-    Text 10,25, "Molette: zoom | Gauche: dÈplacer | Droit: ajouter node"
+    Text 10,25, "Molette: zoom | Gauche: d√©placer | Droit: ajouter node"
     
     Flip
 Wend
