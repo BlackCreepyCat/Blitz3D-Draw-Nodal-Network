@@ -1,6 +1,6 @@
 ; -----------------------------------------------
 ; Name : Draw Nodal network V2 with root creation
-; Date : (C)2025 V3 With file save + smooth pan/zoom
+; Date : (C)2025
 ; Site : https://github.com/BlackCreepyCat
 ; -----------------------------------------------
 
@@ -55,6 +55,7 @@ Function CreateTestNetwork()
         node\Py = root\Py + Sin(angle) * dist
         node\TargetX = node\Px
         node\TargetY = node\Py
+        last_selected = node ; Sélectionner le dernier node créé
     Next
 End Function
 
@@ -147,6 +148,7 @@ Function LoadNetwork(filename$)
         node\TargetX = node\Px
         node\TargetY = node\Py
         ReadInt(file)
+        last_selected = node ; Sélectionner le dernier node chargé
     Next
     
     SeekFile(file, 4)
@@ -201,7 +203,12 @@ While Not KeyHit(1)
             last_mx = MouseX()
             last_my = MouseY()
             selected_node = CheckNodeUnderMouse()
-            If selected_node <> Null Then last_selected = selected_node
+            If selected_node <> Null Then 
+                last_selected = selected_node
+            Else
+                ; Si aucun node n'est sous la souris, désélectionner
+                last_selected = Null
+            EndIf
         Else
             If selected_node <> Null Then
                 mx# = (MouseX() - 400) / cam_zoom - cam_x
@@ -220,7 +227,32 @@ While Not KeyHit(1)
         selected_node = Null
     EndIf
     
-    If MouseHit(2) And last_selected <> Null Then
+    ; Bouton du milieu : création d'un root node avec connexion conditionnelle
+    If MouseHit(2) Then
+        new_root.NodalNet = New NodalNet
+        new_root\NType = 0
+        new_root\Px = (MouseX() - 400) / cam_zoom - cam_x
+        new_root\Py = (MouseY() - 300) / cam_zoom - cam_y
+        new_root\Caption = "Root" + Rnd(1,1000)
+        new_root\TargetX = new_root\Px
+        new_root\TargetY = new_root\Py
+        
+        ; Vérification corrigée pour éviter l'erreur
+        If last_selected <> Null Then
+            If last_selected\NType = 0 Then
+                new_root\Parent = last_selected
+            Else
+                new_root\Parent = Null
+            EndIf
+        Else
+            new_root\Parent = Null
+        EndIf
+        
+        last_selected = new_root
+    EndIf
+    
+    ; Bouton droit : création d'un node de valeur si un node est sélectionné
+    If MouseHit(3) And last_selected <> Null Then
         new_node.NodalNet = New NodalNet
         new_node\NType = 1
         new_node\Value = Rnd(10,100)
@@ -231,17 +263,6 @@ While Not KeyHit(1)
         new_node\Py = (MouseY() - 300) / cam_zoom - cam_y
         new_node\TargetX = new_node\Px
         new_node\TargetY = new_node\Py
-    EndIf
-    
-    If MouseHit(3) Then
-        new_root.NodalNet = New NodalNet
-        new_root\NType = 0
-        new_root\Px = (MouseX() - 400) / cam_zoom - cam_x
-        new_root\Py = (MouseY() - 300) / cam_zoom - cam_y
-        new_root\Caption = "Root" + Rnd(1,1000)
-        new_root\TargetX = new_root\Px
-        new_root\TargetY = new_root\Py
-        last_selected = new_root
     EndIf
     
     ; Interpolation des positions pour les nodes
@@ -308,7 +329,7 @@ While Not KeyHit(1)
     
     Color 255,255,255
     Text 10,10, "Zoom: "+cam_zoom
-    Text 10,25, "Molette: zoom | Gauche: déplacer | Droit: ajouter node"
+    Text 10,25, "Molette: zoom | Gauche: déplacer/sélectionner | Milieu: ajouter root | Droit: ajouter node"
     
     Flip
 Wend
