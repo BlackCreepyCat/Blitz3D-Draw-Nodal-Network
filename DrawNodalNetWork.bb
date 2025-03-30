@@ -62,6 +62,17 @@ Function HasChildren(node.NodalNet)
     Return False
 End Function
 
+Function DeleteNodeAndChildren(node.NodalNet)
+    ; Supprimer d'abord tous les enfants
+    For child.NodalNet = Each NodalNet
+        If child\Parent = node Then
+            DeleteNodeAndChildren(child) ; Suppression récursive
+        EndIf
+    Next
+    ; Supprimer le node lui-même
+    Delete node
+End Function
+
 ; Fonction pour vérifier si la souris est sur un node (roots inclus)
 Function CheckNodeUnderMouse.NodalNet()
     mx# = (MouseX() - 400) / cam_zoom - cam_x
@@ -96,6 +107,12 @@ While Not KeyHit(1) ; ESC pour quitter
     If zoom_change < 0 Then cam_zoom = cam_zoom / 1.1
     If cam_zoom < 0.1 Then cam_zoom = 0.1
     
+If KeyHit(211) And last_selected <> Null Then
+    DeleteNodeAndChildren(last_selected) ; Supprime le node et ses enfants
+    last_selected = Null ; Réinitialiser la sélection
+EndIf
+
+
     ; Gestion de la souris - Clic gauche
     If MouseDown(1) Then
         If Not mouse_down Then
@@ -136,6 +153,7 @@ If MouseHit(2) And last_selected <> Null Then
     new_node\Radius = new_node\Value / 2
     new_node\Parent = last_selected
     new_node\Caption = "New" + Rnd(1,1000)
+
     ; Positionner le nouveau node à la position de la souris dans le monde
     new_node\Px = (MouseX() - 400) / cam_zoom - cam_x
     new_node\Py = (MouseY() - 300) / cam_zoom - cam_y
