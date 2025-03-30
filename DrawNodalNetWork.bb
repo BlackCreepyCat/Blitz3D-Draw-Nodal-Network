@@ -100,6 +100,18 @@ CreateTestNetwork()
 
 While Not KeyHit(1) ; ESC pour quitter
     Cls
+
+    ; Touche S pour sauvegarder
+    If KeyHit(31) Then ; 31 = touche S
+        SaveNetwork("network.txt")
+    EndIf
+    
+    ; Touche L pour charger
+    If KeyHit(38) Then ; 38 = touche L
+        LoadNetwork("network.txt")
+    EndIf
+
+
     
     ; Gestion du zoom avec la molette
     zoom_change = MouseZSpeed()
@@ -182,33 +194,42 @@ EndIf
             Line screen_x, screen_y, parent_x, parent_y
         EndIf
         
-; Dessin des nodes
-If node\NType = 0 Then
-    Color 255,0,0
-    Plot screen_x, screen_y
-    Oval screen_x-3, screen_y-3, 6, 6, 0
-    Color 255,255,255
-    Text screen_x, screen_y+10, node\Caption, True, False
-Else
-    radius_scaled# = node\Radius * cam_zoom
-    If node = selected_node Then
-        Color 0,255,0 ; Vert si actuellement sélectionné
-    ElseIf node = last_selected Then
-        Color 0,255,0 ; Vert si dernier sélectionné
-    ElseIf HasChildren(node) Then
-        Color 255,165,0 ; Orange si le node a des enfants
-    Else
-        Color 0,0,255 ; Bleu sinon
-    EndIf
-
-
-    Oval screen_x - radius_scaled, screen_y - radius_scaled, radius_scaled * 2, radius_scaled * 2, 0
-    Color 255,255,255
-    Text screen_x, screen_y+20, node\Caption, True, False ; Caption au-dessus
-    Text screen_x, screen_y, Int(node\Value), True, True ; Valeur au centre
-EndIf
-
+        ; Dessin des nodes
+        If node\NType = 0 Then
+            ; Dessin du root
+            Color 255,0,0
+            Plot screen_x, screen_y
+            Oval screen_x-3, screen_y-3, 6, 6, 0
+            
+            ; Ajout du cercle rouge foncé si sélectionné
+            If node = selected_node Or node = last_selected Then
+                Color 139,0,0 ; Rouge foncé
+                radius_scaled# = 10 * cam_zoom ; Rayon fixe adapté au zoom
+                Oval screen_x - radius_scaled, screen_y - radius_scaled,    radius_scaled * 2, radius_scaled * 2, 0
+            EndIf
+            
+            Color 255,255,255
+            Text screen_x, screen_y+10, node\Caption, True, False
+        Else
+            ; Dessin des nodes de valeur (inchangé)
+            radius_scaled# = node\Radius * cam_zoom
+            If node = selected_node Then
+                Color 0,255,0 ; Vert si actuellement sélectionné
+            ElseIf node = last_selected Then
+                Color 0,255,0 ; Vert si dernier sélectionné
+            ElseIf HasChildren(node) Then
+                Color 255,165,0 ; Orange si le node a des enfants
+            Else
+                Color 0,0,255 ; Bleu sinon
+            EndIf
+            
+            Oval screen_x - radius_scaled, screen_y - radius_scaled,   radius_scaled * 2, radius_scaled * 2, 0
+            Color 255,255,255
+            Text screen_x, screen_y+20, node\Caption, True, False
+            Text screen_x, screen_y, Int(node\Value), True, True
+        EndIf
     Next
+
     
     ; Affichage des infos
     Color 255,255,255
@@ -219,3 +240,100 @@ EndIf
 Wend
 
 End
+
+
+
+; Fonction pour sauvegarder les nodes dans un fichier texte
+Function SaveNetwork(filename$)
+    file = WriteFile(filename$)
+    If file = 0 Then Return False
+    
+    ; Compter et écrire le nombre total de nodes
+    count = 0
+    For node.NodalNet = Each NodalNet
+        count = count + 1
+    Next
+    WriteInt(file, count)
+    
+    ; Écrire chaque node avec ses données
+    For node.NodalNet = Each NodalNet
+        WriteInt(file, node\NType)       ; Type de node
+        WriteInt(file, node\Radius)      ; Rayon
+        WriteFloat(file, node\Value)     ; Valeur
+        WriteInt(file, node\Px)          ; Position X
+        WriteInt(file, node\Py)          ; Position Y
+        WriteString(file, node\Caption)  ; Légende
+        
+        ; Trouver et écrire l'index du parent
+        parent_index = -1
+        index = 0
+        For n.NodalNet = Each NodalNet
+            If n = node\Parent Then
+                parent_index = index
+                Exit
+            EndIf
+            index = index + 1
+        Next
+        WriteInt(file, parent_index)
+    Next
+    
+    CloseFile(file)
+    Return True
+End Function
+
+; Fonction pour charger les nodes depuis un fichier texte
+Function LoadNetwork(filename$)
+    ; Supprimer tous les nodes existants
+    For node.NodalNet = Each NodalNet
+        Delete node
+    Next
+    
+    file = ReadFile(filename$)
+    If file = 0 Then Return False
+    
+    ; Lire le nombre de nodes
+    count = ReadInt(file)
+    
+    ; Première passe : créer tous les nodes sans leurs parents
+    For i = 1 To count
+        node.NodalNet = New NodalNet
+        node\NType = ReadInt(file)
+        node\Radius = ReadInt(file)
+        node\Value = ReadFloat(file)
+        node\Px = ReadInt(file)
+        node\Py = ReadInt(file)
+        node\Caption = ReadString(file)
+        ReadInt(file) ; Sauter l'index du parent pour l'instant
+    Next
+    
+    ; Remettre le pointeur au début après le count
+    SeekFile(file, 4)
+    
+    ; Deuxième passe : assigner les parents
+    For node.NodalNet = Each NodalNet
+        ReadInt(file)    ; Sauter NType
+        ReadInt(file)    ; Sauter Radius
+        ReadFloat(file)  ; Sauter Value
+        ReadInt(file)    ; Sauter Px
+        ReadInt(file)    ; Sauter Py
+        ReadString(file) ; Sauter Caption
+        parent_index = ReadInt(file)
+        
+        If parent_index >= 0 Then
+            ; Trouver le parent par son index
+            index = 0
+            For n.NodalNet = Each NodalNet
+                If index = parent_index Then
+                    node\Parent = n
+                    Exit
+                EndIf
+                index = index + 1
+            Next
+        Else
+            node\Parent = Null
+        EndIf
+    Next
+    
+    CloseFile(file)
+    Return True
+End Function
